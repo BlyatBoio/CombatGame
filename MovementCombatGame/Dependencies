@@ -1,1 +1,146 @@
+function tDist(x, x2){
+  if(x < x2) return dist(x, 0, x2, 0);
+  return -dist(x, 0, x2, 0);
+}
 
+function collc(x, y, w, h, x2, y2, w2, h2, bx, by)
+{
+  // apply the bezzle to the xs
+  if (bx != 0 && bx != undefined)
+  {
+    x = x - bx / 2;
+    x2 = x2 - bx / 2;
+    w = w + bx;
+    w2 = w2 + bx;
+  }
+
+  // apply the bezzle to the ys
+  if (by != 0 && by != undefined)
+  {
+    y = y - by / 2;
+    y2 = y2 - by / 2;
+    h = h + by;
+    h2 = h2 + by;
+  }
+
+  // draw hit boxes if debug mode is on and H is pressed
+  if (keyIsDown(72)) {fill(200, 50, 50, 100); rect(x, y, w, h); rect(x2, y2, w2, h2) }
+
+  // actual collisions
+  if (x + w > x2 && x < x2 + w2 && y + h > y2 && y < y2 + h2) return true;
+
+  return false;
+}
+
+function del(a, i2)
+{
+  // empty array that will replace the inputted array
+  let arr1 = [];
+  let arr2 = a;
+
+  // itterate over the given array
+  for (let i = 0; i < arr2.length; i++)
+  {
+
+    // if the index is equal to the given index, dont push that item into the clear array
+    if (i != i2) arr1.push(arr2[i]);
+    // shift the other ID's down if they were above the deleted item if they have ids
+    if (i > i2 && arr2[i].id != undefined) arr2[i].id--;
+  }
+
+  // return new array
+  return arr1;
+}
+class particle {
+  constructor(x, y, w, h, shape, xSpeed, ySpeed, color1, color2, lifeSpan, easing, folowCamera, applyGravity){
+    // position and size
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.h = h;
+    this.shape = shape; // what type of shape is drawn
+
+    // incriment position
+    this.xSpeed = xSpeed;
+    this.ySpeed = ySpeed;
+
+    // start color and fade color
+    this.color1 = color1;
+    this.color2 = color2;
+
+    // time the particle exists
+    this.lifeSpan = lifeSpan;
+    this.easing = easing;
+
+    // ammount the color changes per frame
+    this.color0Incriment = tDist(this.color1[0], this.color2[0]) / this.lifeSpan;
+    this.color1Incriment = tDist(this.color1[1], this.color2[1]) / this.lifeSpan;
+    this.color2Incriment = tDist(this.color1[2], this.color2[2]) / this.lifeSpan;
+    this.color3Incriment = tDist(this.color1[3], this.color2[3]) / this.lifeSpan;
+
+    // color actually used to fill in for the shape
+    this.currentColor = [color1[0], color1[1], color1[2], color1[3]];
+
+    // timers to determine where the particle is in its lifespan
+    this.timer = 0;
+    this.lifeTimer = 0;
+    this.pastFrameTimer = 0;
+
+    this.folowCamera = folowCamera; // defines whether to draw the particle at its literal position or in relaiton to the camera
+    this.applyGravity = applyGravity; // determiens whether the particle applies gravity
+    // used for deleting itself.
+    this.id = parts.length;
+    parts.push(this);
+  }
+  drawSelf(){
+    this.updateChanges();
+    // fill by the curent colot
+    fill(this.currentColor[0], this.currentColor[1], this.currentColor[2], this.currentColor[3]);
+
+    // if it follows the camera, transform by the camera position
+    let xoffset = 0;
+    let yoffset = 0;
+    if(this.folowCamera == true) {xoffset = cameraX; yoffset = cameraY}
+
+    noStroke(); 
+
+    if(this.shape == "Circle") ellipse(this.x - xoffset, this.y - yoffset, this.w, this.h); // draw a circle
+    else if(this.shape == "Rect") rect(this.x - xoffset, this.y - yoffset, this.w, this.h); // draw a rectange 
+    else image(this.shape, this.x - xoffset, this.y - yoffset, this.w, this.h); // if it isnt either, it is an image and is drawn to the size of the particle
+  }
+  updateChanges(){
+    // update the timer based on the provided easing
+    this.pastFrameTimer = this.timer;
+    this.lifeTimer ++;
+    switch(this.easing){
+      case "Linear":
+        this.timer ++;
+        break;
+      case "Exponential":
+        this.timer += 1+this.timer/10; // straight exponential would be way too fast
+        break;
+      case "Ease In Out":
+        this.timer += 0.1+abs(this.lifeSpan/2 - dist(this.lifeTimer, 0, this.lifeSpan/2, 0)); // as it gets closer to the middle, it speeds up but slows down on the end
+        break;
+      case "Speed In Out":
+        this.timer += 1+dist(this.lifeTimer, 0, this.lifeSpan/2, 0); // as it gets closer to the middle, it slows down
+    }
+
+    // all changes are multiplied by the totalTimerIncrease in order to apply easing functions
+    let totalTimerIncrease = dist(this.timer, 0, this.pastFrameTimer, 0);
+    
+    // add position vars
+    this.x += this.xSpeed * totalTimerIncrease;
+    this.y += this.ySpeed * totalTimerIncrease;
+    if(this.applyGravity == true) this.ySpeed += gravity;
+
+    // step the color fading
+    this.currentColor[0] += this.color0Incriment;
+    this.currentColor[1] += this.color1Incriment;
+    this.currentColor[2] += this.color2Incriment;
+    this.currentColor[3] += this.color3Incriment;
+
+    // kill off the particle if it has reached its lifespan
+    if(this.lifeTimer >= this.lifeSpan) parts = del(parts, this.id);
+  }
+}
